@@ -21,9 +21,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	tekv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -35,7 +38,36 @@ const QueueLabel = "kueue.x-k8s.io/queue-name"
 func SetupPipelineRunWebhookWithManager(mgr ctrl.Manager, defaulter admission.CustomDefaulter) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&tekv1.PipelineRun{}).
 		WithDefaulter(defaulter).
+		WithLogConstructor(logConstructor).
 		Complete()
+}
+
+func logConstructor(base logr.Logger, req *admission.Request) logr.Logger {
+	gvk := (&tekv1.PipelineRun{}).GetGroupVersionKind()
+	log := base.WithValues(
+		"webhookGroup", gvk.Group,
+		"webhookKind", gvk.Kind,
+	)
+	if req != nil {
+		log = log.WithValues(
+			"webhookGroup", tekv1.SchemeGroupVersion.Group,
+			"webhookKind", gvk.Kind,
+			gvk.Kind, klog.KRef(req.Namespace, req.Name),
+			"namespace", req.Namespace,
+			"name", req.Name,
+			"resource", req.Resource,
+			"user", req.UserInfo.Username,
+			"requestID", req.UID,
+		)
+
+		if a, err := meta.Accessor(req.Object); err == nil {
+			if a.GetName() == "" {
+				// add the generate name only if the name is unset
+				return log.WithValues("generateName", a.GetGenerateName())
+			}
+		}
+	}
+	return log
 }
 
 type PipelineRunMutator interface {
