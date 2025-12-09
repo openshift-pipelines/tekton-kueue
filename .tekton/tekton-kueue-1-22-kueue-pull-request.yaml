@@ -17,7 +17,7 @@ metadata:
       ".tekton/tekton-kueue-1-22-kueue-pull-request.yaml".pathChanged())
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-1-22
-    appstudio.openshift.io/component: tekton-kueue-kueue-1-22
+    appstudio.openshift.io/component: tekton-kueue-1-22-kueue
     pipelines.appstudio.openshift.io/type: build
   name: tekton-kueue-1-22-kueue-on-pull-request
   namespace: tekton-ecosystem-tenant
@@ -25,6 +25,8 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
+  - name: upstream-git-url
+    value: 'https://github.com/konflux-ci/tekton-kueue'
   - name: revision
     value: '{{revision}}'
   - name: output-image
@@ -35,7 +37,6 @@ spec:
     value: .konflux/dockerfiles/kueue.Dockerfile
   - name: additional-tags
     value:
-      - "on-pr-1.22"
       - "on-pr-1.22.0"
   - name: build-platforms
     value:
@@ -47,7 +48,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-tekton-kueue-kueue-1-22
+    serviceAccountName: build-pipeline-tekton-kueue-1-22-kueue
   workspaces:
   - name: git-auth
     secret:
