@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package v1
 
 import (
 	"context"
@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/konflux-ci/tekton-queue/internal/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -41,8 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	v1 "github.com/konflux-ci/tekton-queue/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -116,9 +113,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	defaulter, err := v1.NewCustomDefaulter(&config.Config{QueueName: "pipelines-queue"}, nil)
-	Expect(err).NotTo(HaveOccurred())
-	err = v1.SetupPipelineRunWebhookWithManager(mgr, defaulter)
+	err = SetupPipelineRunWebhookWithManager(mgr, &pipelineRunCustomDefaulter{QueueName: "pipelines-queue"})
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook
