@@ -15,13 +15,11 @@
     "mintmaker"
   ],
   "ignorePaths": ["upstream/**"],
-
   "autoApprove": true,
   "packageRules": [
     {
       "matchPackageNames": ["*"],
-      "automerge": true,
-      "ignorePaths": ["upstream/**"]
+      "automerge": true
     }
   ]
 }
