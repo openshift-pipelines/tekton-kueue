@@ -10,16 +10,16 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "next" &&
+      == "release-v1.14.x" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
       ".konflux/dockerfiles/kueue.Dockerfile".pathChanged() ||
-      ".tekton/tekton-kueue-next-kueue-push.yaml".pathChanged())
+      ".tekton/tekton-kueue-1-14-kueue-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-core-next
-    appstudio.openshift.io/component: tekton-kueue-next-kueue
+    appstudio.openshift.io/application: openshift-pipelines-core-1-14
+    appstudio.openshift.io/component: tekton-kueue-1-14-kueue
     pipelines.appstudio.openshift.io/type: build
-  name: tekton-kueue-next-kueue-on-push
+  name: tekton-kueue-1-14-kueue-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -35,7 +35,7 @@ spec:
     value: .konflux/dockerfiles/kueue.Dockerfile
   - name: additional-tags
     value:
-      - "next"
+      - "1.14.0"
   - name: prefetch-input
     value: |
       {"type": "gomod", "path": "upstream"}
@@ -43,7 +43,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-tekton-kueue-next-kueue
+    serviceAccountName: build-pipeline-tekton-kueue-1-14-kueue
   workspaces:
   - name: git-auth
     secret:
