@@ -10,27 +10,32 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-v0.1.x" &&
+      == "release-v0.2.x" &&
       ("***".pathChanged() ||
       "Dockerfile".pathChanged() ||
-      ".tekton/tekton-kueue-0-1-kueue-push.yaml".pathChanged())
+      ".tekton/tekton-kueue-0-2-kueue-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: tekton-kueue-0-1
-    appstudio.openshift.io/component: tekton-kueue-kueue-0-1
+    appstudio.openshift.io/application: tekton-kueue-0-2
+    appstudio.openshift.io/component: tekton-kueue-0-2-kueue
     pipelines.appstudio.openshift.io/type: build
-  name: tekton-kueue-0-1-kueue-on-push
+  name: tekton-kueue-0-2-kueue-on-push
   namespace: konflux-infra-tenant
 spec:
   params:
   - name: git-url
     value: '{{source_url}}'
+  - name: upstream-git-url
+    value: 'https://github.com/'
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/konflux-infra-tenant/kueue-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/konflux-infra-tenant/tekton-kueue/kueue-rhel9:{{revision}}
   - name: dockerfile
     value: Dockerfile
+  - name: additional-tags
+    value:
+      - "0.2.0"
   - name: prefetch-input
     value: |
       {"type": "gomod", "path": "."}
@@ -38,7 +43,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-tekton-kueue-kueue-0-1
+    serviceAccountName: build-pipeline-tekton-kueue-0-2-kueue
   workspaces:
   - name: git-auth
     secret:
