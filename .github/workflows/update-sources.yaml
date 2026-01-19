@@ -13,14 +13,14 @@ jobs:
     - name: Checkout the current repo
       uses: actions/checkout@v4
       with:
-        ref: next
+        ref: release-v1.15.x
 
     - name: Clone konflux-ci/tekton-kueue
       run: |
         rm -fR upstream
         git clone https://github.com/konflux-ci/tekton-kueue upstream
         pushd upstream
-        git checkout -B release-v0.2.x origin/release-v0.2.x
+        git checkout -B release-v1.15.x origin/release-v1.15.x
         popd
     - name: Commit new changes
       run: |
@@ -29,7 +29,7 @@ jobs:
         
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/update/sources-next
+        git checkout -b actions/update/sources-release-v1.15.x
         touch head
         pushd upstream
         OLD_COMMIT=$(cat ../head)
@@ -50,7 +50,7 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot] Update next from konflux-ci/tekton-kueue to ${NEW_COMMIT}
+        [bot] Update release-v1.15.x from konflux-ci/tekton-kueue to ${NEW_COMMIT}
 
             $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
         $(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)
@@ -58,14 +58,14 @@ jobs:
         https://github.com/konflux-ci/tekton-kueue/compare/${NEW_COMMIT}..${OLD_COMMIT}
         EOF
         
-        git push -f origin actions/update/sources-next
+        git push -f origin actions/update/sources-release-v1.15.x
 
-        if [ "$(gh pr list --base next --head actions/update/sources-next --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base release-v1.15.x --head actions/update/sources-release-v1.15.x --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B next -H actions/update/sources-next --label=automated --label=upstream --fill
+          gh pr create -B release-v1.15.x -H actions/update/sources-release-v1.15.x --label=automated --label=upstream --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update next from konflux-ci/tekton-kueue to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
+          gh pr edit --title "[bot] Update release-v1.15.x from konflux-ci/tekton-kueue to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
