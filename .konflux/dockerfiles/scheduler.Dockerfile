@@ -1,4 +1,4 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.24
+ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.25@sha256:359dd4c6c4255b3f7bce4dc15ffa5a9aa65a401f819048466fa91baa8244a793
 ARG RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:e1c4703364c5cb58f5462575dc90345bcd934ddc45e6c32f9c162f2b5617681c
 
 FROM $GO_BUILDER AS builder
@@ -17,7 +17,7 @@ RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHA
 # RUN /bin/sh -c 'echo $CI_OPERATOR_UPSTREAM_COMMIT > /tmp/HEAD'
 
 FROM $RUNTIME
-
+ARG VERSION=nightly
 ENV KUEUE=/tmp/tekton-kueue  \
     KO_DATA_PATH=/kodata
 
@@ -26,7 +26,7 @@ COPY --from=builder $KUEUE $KUEUE
 LABEL \
       com.redhat.component="openshift-pipelines-rhel9-kueue" \
       name="openshift-pipelines/pipelines-rhel9-kueue" \
-      version="1.16.0" \
+      version="$VERSION" \
       summary="Red Hat OpenShift Pipelines Kueue" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Kueue" \
