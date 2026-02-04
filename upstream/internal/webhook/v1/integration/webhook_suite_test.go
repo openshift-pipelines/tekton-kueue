@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/konflux-ci/tekton-queue/internal/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -41,7 +42,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	v1 "github.com/konflux-ci/tekton-kueue/internal/webhook/v1"
+	v1 "github.com/konflux-ci/tekton-queue/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -114,15 +115,9 @@ var _ = BeforeSuite(func() {
 		Metrics:        metricsserver.Options{BindAddress: "0"},
 	})
 	Expect(err).NotTo(HaveOccurred())
-	cfgStore := &v1.ConfigStore{}
-	rawConfig := "queueName: pipelines-queue"
 
-	err = cfgStore.Update([]byte(rawConfig))
+	defaulter, err := v1.NewCustomDefaulter(&config.Config{QueueName: "pipelines-queue"}, nil)
 	Expect(err).NotTo(HaveOccurred())
-
-	defaulter, err := v1.NewCustomDefaulter(cfgStore)
-	Expect(err).NotTo(HaveOccurred())
-
 	err = v1.SetupPipelineRunWebhookWithManager(mgr, defaulter)
 	Expect(err).NotTo(HaveOccurred())
 

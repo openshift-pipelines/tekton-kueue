@@ -57,26 +57,19 @@ var (
 	PLRLog                                = ctrl.Log.WithName(ControllerName)
 )
 
-func SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	reconcilerFactory := jobframework.NewGenericReconcilerFactory(
+func SetupWithManager(mgr ctrl.Manager) error {
+	workloadReconciler := jobframework.NewGenericReconcilerFactory(
 		func() jobframework.GenericJob { return &PipelineRun{} },
 		func(b *builder.Builder, c client.Client) *builder.Builder {
 			return b.Named("PipelineRunWorkloads")
 		},
 	)
 
-	reconciler, err := reconcilerFactory(
-		ctx,
+	return workloadReconciler(
 		mgr.GetClient(),
-		mgr.GetFieldIndexer(),
 		mgr.GetEventRecorderFor("kueue-plr"),
 		jobframework.WithWaitForPodsReady(&kueueconfig.WaitForPodsReady{}),
-	)
-	if err != nil {
-		return err
-	}
-
-	return reconciler.SetupWithManager(mgr)
+	).SetupWithManager(mgr)
 }
 
 func SetupIndexer(ctx context.Context, fieldIndexer client.FieldIndexer) error {
