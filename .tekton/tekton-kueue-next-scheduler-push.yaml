@@ -12,14 +12,14 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "next" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/kueue.Dockerfile".pathChanged() ||
-      ".tekton/tekton-kueue-next-kueue-push.yaml".pathChanged())
+      ".konflux/dockerfiles/scheduler.Dockerfile".pathChanged() ||
+      ".tekton/tekton-kueue-next-scheduler-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-next
-    appstudio.openshift.io/component: tekton-kueue-next-kueue
+    appstudio.openshift.io/component: tekton-kueue-next-scheduler
     pipelines.appstudio.openshift.io/type: build
-  name: tekton-kueue-next-kueue-on-push
+  name: tekton-kueue-next-scheduler-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,9 +30,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-kueue-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-scheduler-rhel9:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/kueue.Dockerfile
+    value: .konflux/dockerfiles/scheduler.Dockerfile
   - name: additional-tags
     value:
       - "next"
@@ -43,7 +43,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-tekton-kueue-next-kueue
+    serviceAccountName: build-pipeline-tekton-kueue-next-scheduler
   workspaces:
   - name: git-auth
     secret:
