@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/konflux-ci/tekton-queue/internal/common"
-	"github.com/konflux-ci/tekton-queue/internal/config"
+	"github.com/konflux-ci/tekton-kueue/pkg/common"
+	"github.com/konflux-ci/tekton-kueue/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tektondevv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -56,8 +56,13 @@ var _ = Describe("PipelineRun Webhook", func() {
 					QueueName:          "test-queue",
 					MultiKueueOverride: true,
 				}
+
+				cfgStore := &ConfigStore{
+					config: cfg,
+				}
+
 				var err error
-				defaulter, err = NewCustomDefaulter(cfg, []PipelineRunMutator{})
+				defaulter, err = NewCustomDefaulter(cfgStore)
 				Expect(err).NotTo(HaveOccurred())
 				err = defaulter.Default(ctx, plr)
 				Expect(err).NotTo(HaveOccurred())
@@ -72,8 +77,11 @@ var _ = Describe("PipelineRun Webhook", func() {
 					QueueName:          "test-queue",
 					MultiKueueOverride: false,
 				}
+				cfgStore := &ConfigStore{
+					config: cfg,
+				}
 				var err error
-				defaulter, err = NewCustomDefaulter(cfg, []PipelineRunMutator{})
+				defaulter, err = NewCustomDefaulter(cfgStore)
 				Expect(err).NotTo(HaveOccurred())
 				err = defaulter.Default(ctx, plr)
 				Expect(err).NotTo(HaveOccurred())
@@ -85,12 +93,167 @@ var _ = Describe("PipelineRun Webhook", func() {
 			cfg := &config.Config{
 				QueueName: "test-queue",
 			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+			}
 			var err error
-			defaulter, err = NewCustomDefaulter(cfg, []PipelineRunMutator{})
+			defaulter, err = NewCustomDefaulter(cfgStore)
 			Expect(err).NotTo(HaveOccurred())
 			err = defaulter.Default(ctx, plr)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(plr.Labels[common.QueueLabel]).To(Equal("test-queue"))
+		})
+
+		It("should accept a valid PipelineRun with pipelineRef", func(ctx context.Context) {
+			plrWithRef := &tektondevv1.PipelineRun{
+				Spec: tektondevv1.PipelineRunSpec{
+					PipelineRef: &tektondevv1.PipelineRef{
+						Name: "my-pipeline",
+					},
+				},
+			}
+
+			cfg := &config.Config{
+				QueueName: "test-queue",
+			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+			}
+			var err error
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			err = defaulter.Default(ctx, plrWithRef)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(plrWithRef.Spec.Status).To(Equal(tektondevv1.PipelineRunSpecStatus(tektondevv1.PipelineRunSpecStatusPending)))
+			Expect(plrWithRef.Labels[common.QueueLabel]).To(Equal("test-queue"))
+		})
+
+		It("should accept a valid PipelineRun with pipelineSpec", func(ctx context.Context) {
+			plrWithSpec := &tektondevv1.PipelineRun{
+				Spec: tektondevv1.PipelineRunSpec{
+					PipelineSpec: &tektondevv1.PipelineSpec{
+						Tasks: []tektondevv1.PipelineTask{
+							{
+								Name: "echo",
+								TaskSpec: &tektondevv1.EmbeddedTask{
+									TaskSpec: tektondevv1.TaskSpec{
+										Steps: []tektondevv1.Step{
+											{
+												Name:   "echo",
+												Image:  "alpine:latest",
+												Script: "echo hello",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			cfg := &config.Config{
+				QueueName: "test-queue",
+			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+			}
+			var err error
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			err = defaulter.Default(ctx, plrWithSpec)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(plrWithSpec.Spec.Status).To(Equal(tektondevv1.PipelineRunSpecStatus(tektondevv1.PipelineRunSpecStatusPending)))
+			Expect(plrWithSpec.Labels[common.QueueLabel]).To(Equal("test-queue"))
+		})
+
+		It("should reject an invalid PipelineRun with neither pipelineRef nor pipelineSpec", func(ctx context.Context) {
+			invalidPlr := &tektondevv1.PipelineRun{
+				Spec: tektondevv1.PipelineRunSpec{
+					// Neither pipelineRef nor pipelineSpec is set - this is invalid
+				},
+			}
+
+			cfg := &config.Config{
+				QueueName: "test-queue",
+			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+			}
+			var err error
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			err = defaulter.Default(ctx, invalidPlr)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should accept a PipelineRun with pipelineSpec containing a parameter without explicit type", func(ctx context.Context) {
+			// This reproduces the bug where PipelineRuns with parameters missing the 'type' field
+			// (like enable-cache-proxy) were rejected with:
+			// "invalid value: : params.enable-cache-proxy.type"
+			// The type should default to "string" and be valid.
+			plrWithParamNoType := &tektondevv1.PipelineRun{
+				Spec: tektondevv1.PipelineRunSpec{
+					Params: []tektondevv1.Param{
+						{
+							Name:  "enable-cache-proxy",
+							Value: tektondevv1.ParamValue{Type: tektondevv1.ParamTypeString, StringVal: "false"},
+						},
+					},
+					PipelineSpec: &tektondevv1.PipelineSpec{
+						Params: []tektondevv1.ParamSpec{
+							{
+								Name:        "enable-cache-proxy",
+								Description: "Enable cache proxy configuration",
+								Default:     &tektondevv1.ParamValue{Type: tektondevv1.ParamTypeString, StringVal: "false"},
+								// Note: Type field is NOT set - this should default to string
+							},
+						},
+						Tasks: []tektondevv1.PipelineTask{
+							{
+								Name: "init",
+								Params: []tektondevv1.Param{
+									{
+										Name:  "enable-cache-proxy",
+										Value: tektondevv1.ParamValue{Type: tektondevv1.ParamTypeString, StringVal: "$(params.enable-cache-proxy)"},
+									},
+								},
+								TaskSpec: &tektondevv1.EmbeddedTask{
+									TaskSpec: tektondevv1.TaskSpec{
+										Params: []tektondevv1.ParamSpec{
+											{
+												Name: "enable-cache-proxy",
+												// Type field is NOT set
+											},
+										},
+										Steps: []tektondevv1.Step{
+											{
+												Name:   "echo",
+												Image:  "alpine:latest",
+												Script: "echo $(params.enable-cache-proxy)",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			cfg := &config.Config{
+				QueueName: "test-queue",
+			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+			}
+			var err error
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			err = defaulter.Default(ctx, plrWithParamNoType)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(plrWithParamNoType.Spec.Status).To(Equal(tektondevv1.PipelineRunSpecStatus(tektondevv1.PipelineRunSpecStatusPending)))
+			Expect(plrWithParamNoType.Labels[common.QueueLabel]).To(Equal("test-queue"))
 		})
 	})
 })
