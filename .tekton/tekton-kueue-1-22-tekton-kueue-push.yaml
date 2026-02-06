@@ -13,13 +13,13 @@ metadata:
       == "release-v1.22.x" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
       ".konflux/dockerfiles/scheduler.Dockerfile".pathChanged() ||
-      ".tekton/tekton-kueue-1-22-scheduler-push.yaml".pathChanged())
+      ".tekton/tekton-kueue-1-22-tekton-kueue-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-1-22
-    appstudio.openshift.io/component: tekton-kueue-1-22-scheduler
+    appstudio.openshift.io/component: tekton-kueue-1-22-tekton-kueue
     pipelines.appstudio.openshift.io/type: build
-  name: tekton-kueue-1-22-scheduler-on-push
+  name: tekton-kueue-1-22-tekton-kueue-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,7 +30,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-scheduler-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-tekton-kueue-rhel9:{{revision}}
   - name: dockerfile
     value: .konflux/dockerfiles/scheduler.Dockerfile
   - name: additional-tags
@@ -43,7 +43,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-tekton-kueue-1-22-scheduler
+    serviceAccountName: build-pipeline-tekton-kueue-1-22-tekton-kueue
   workspaces:
   - name: git-auth
     secret:
