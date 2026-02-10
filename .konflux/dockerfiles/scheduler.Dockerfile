@@ -17,10 +17,9 @@ RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHA
 
 FROM $RUNTIME
 
-ENV KUEUE=/tmp/manager
-
-COPY --from=builder $KUEUE $KUEUE
 ARG VERSION=1.22.0
+
+COPY --from=builder /tmp/manager /manager
 LABEL \
       com.redhat.component="openshift-pipelines-rhel9-scheduler" \
       name="openshift-pipelines/pipelines-rhel9-scheduler" \
@@ -35,4 +34,4 @@ LABEL \
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
 
-ENTRYPOINT [ "${KUEUE}" ]
+ENTRYPOINT [ "/manager" ]
