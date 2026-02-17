@@ -21,15 +21,16 @@ ARG VERSION=1.22.0
 
 COPY --from=builder /tmp/manager /manager
 LABEL \
-      com.redhat.component="openshift-pipelines-rhel9-scheduler" \
-      name="openshift-pipelines/pipelines-rhel9-scheduler" \
-      version="$VERSION" \
-      summary="Red Hat OpenShift Pipelines Scheduler" \
+      com.redhat.component="openshift-pipelines-scheduler-rhel9-container" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
+      description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      io.openshift.tags="tekton,openshift,tekton-kueue,scheduler" \
       maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Scheduler" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Scheduler" \
-      io.k8s.description="Red Hat OpenShift Pipelines Scheduler" \
-      io.openshift.tags="scheduler,tekton,openshift"
+      name="openshift-pipelines/pipelines-scheduler-rhel9" \
+      summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      version="v1.22.0"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
