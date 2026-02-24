@@ -24,15 +24,16 @@ ENV KUEUE=/tmp/tekton-kueue  \
 COPY --from=builder $KUEUE $KUEUE
 
 LABEL \
-      com.redhat.component="openshift-pipelines-rhel9-kueue" \
-      name="openshift-pipelines/pipelines-rhel9-kueue" \
-      version="1.16.0" \
-      summary="Red Hat OpenShift Pipelines Kueue" \
+      com.redhat.component="openshift-pipelines-scheduler-rhel9-container" \
+      cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+      description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      io.openshift.tags="tekton,openshift,tekton-kueue,scheduler" \
       maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Kueue" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Kueue" \
-      io.k8s.description="Red Hat OpenShift Pipelines Kueue" \
-      io.openshift.tags="kueue,tekton,openshift"
+      name="openshift-pipelines/pipelines-scheduler-rhel9" \
+      summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+      version="next"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
