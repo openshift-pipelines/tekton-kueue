@@ -26,11 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/konflux-ci/tekton-kueue/pkg/common"
+	"github.com/konflux-ci/tekton-kueue/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v3"
 
-	webhookv1 "github.com/konflux-ci/tekton-queue/internal/webhook/v1"
-	"github.com/konflux-ci/tekton-queue/test/utils"
+	"github.com/konflux-ci/tekton-kueue/test/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -46,7 +48,7 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	kapi "knative.dev/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	kueue "sigs.k8s.io/kueue/apis/kueue/v1beta1"
+	kueue "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 	"sigs.k8s.io/kueue/pkg/controller/jobframework"
 )
 
@@ -483,11 +485,11 @@ var _ = Describe("Manager", Ordered, func() {
 						return err
 					}
 					const defaultPriorityClassName = "tekton-kueue-default"
-					if wl.Spec.PriorityClassName != defaultPriorityClassName {
+					if wl.Spec.PriorityClassRef.Name != defaultPriorityClassName {
 						return fmt.Errorf(
 							"Workload should have priority class %s, but has %s",
 							defaultPriorityClassName,
-							wl.Spec.PriorityClassName,
+							wl.Spec.PriorityClassRef.Name,
 						)
 					}
 					return err
@@ -567,7 +569,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("PipelineRun is queued because lack of resources", func(ctx context.Context) {
 			plr = plrTemplate.DeepCopy()
 			plr.Labels = map[string]string{
-				webhookv1.QueueLabel: "blocking-pipelines-queue",
+				common.QueueLabel: "blocking-pipelines-queue",
 			}
 			Eventually(
 				func() error {
@@ -597,6 +599,90 @@ var _ = Describe("Manager", Ordered, func() {
 				ctx,
 			)
 		})
+	})
+
+	Context("Reload Config when ConfigMap is updated", Ordered, Label("config", "smoke"), func() {
+		queueName := "my-updated-queue"
+		kueueConfig := config.Config{
+			QueueName: queueName,
+		}
+
+		cfgMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      common.ConfigMapName,
+				Namespace: "tekton-kueue",
+			},
+			Data: map[string]string{},
+		}
+
+		It("Updated Queue Label must be applied on pipelinerun", func(ctx context.Context) {
+
+			cfgMapData, err := yaml.Marshal(kueueConfig)
+			Expect(err).ToNot(HaveOccurred())
+
+			cfgMap.Data[common.ConfigKey] = string(cfgMapData)
+
+			err = k8sClient.Update(ctx, cfgMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// ConfigMap Reconciler should load the updated configMap
+			// Updated Label must be applied on Pipelinerun
+			Eventually(func() string {
+				plr := plrTemplate.DeepCopy()
+				err = k8sClient.Create(ctx, plr)
+				Expect(err).NotTo(HaveOccurred())
+				return plr.ObjectMeta.Labels[common.QueueLabel]
+			}).WithTimeout(time.Duration(30) * time.Second).Should(Equal(queueName))
+
+		})
+
+	})
+
+	Context("Ignore Config when ConfigMap is updated with invalid Values", Ordered, Label("config", "smoke"), func() {
+		queueName := "my-ignored-queue"
+		kueueConfig := config.Config{
+			QueueName: queueName,
+			CEL: config.CEL{
+				Expressions: []string{
+					"invalid-cel-expression",
+				},
+			},
+		}
+
+		cfgMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      common.ConfigMapName,
+				Namespace: "tekton-kueue",
+			},
+			Data: map[string]string{},
+		}
+
+		It("Updated Queue Label must not be applied on pipelinerun", func(ctx context.Context) {
+
+			cfgMapData, err := yaml.Marshal(kueueConfig)
+			Expect(err).ToNot(HaveOccurred())
+
+			cfgMap.Data[common.ConfigKey] = string(cfgMapData)
+
+			err = k8sClient.Update(ctx, cfgMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// ConfigMap Reconciler should not load the updated configMap
+			// Now label must not be applied on pipelinerun
+			Consistently(func() string {
+				plr := plrTemplate.DeepCopy()
+				err = k8sClient.Create(ctx, plr)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Updated Label must be applied on Pipelinerun
+				return plr.ObjectMeta.Labels[common.QueueLabel]
+
+			}).WithTimeout(time.Duration(10) * time.Second).
+				WithPolling(500 * time.Millisecond).
+				ShouldNot(Equal(queueName))
+
+		})
+
 	})
 })
 
@@ -656,12 +742,11 @@ func EnsurePipelineRunSpecStatusIs(
 
 func GetOwnedWorkload(k8sClient client.Client, plr *tekv1.PipelineRun, ctx context.Context) (*kueue.Workload, error) {
 	wlList := &kueue.WorkloadList{}
-	ownerKey := jobframework.GetOwnerKey(tekv1.SchemeGroupVersion.WithKind("PipelineRun"))
 	err := k8sClient.List(
 		ctx,
 		wlList,
 		client.InNamespace(plr.GetNamespace()),
-		client.MatchingFields{ownerKey: plr.Name},
+		jobframework.OwnerReferenceIndexFieldMatcher(tekv1.SchemeGroupVersion.WithKind("PipelineRun"), plr.Name),
 	)
 	if err != nil {
 		return nil, err
