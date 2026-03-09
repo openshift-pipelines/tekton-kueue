@@ -25,7 +25,7 @@ COPY --from=builder $KUEUE $KUEUE
 
 LABEL \
     com.redhat.component="openshift-pipelines-scheduler-rhel9-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.15::el9" \
     description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
@@ -33,7 +33,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-scheduler-rhel9" \
     summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    version="next"
+    version="v1.15.5"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
