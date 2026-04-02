@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM registry.access.redhat.com/ubi9/go-toolset:9.7-1773016755@sha256:71101fd9ba32aabeaec2c073e5786c91642aaee902475fce3d8280457fb19e9d AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.7-1775042950@sha256:4b7a967ce9c283ecfb1e7a186f7b97d3f35a479bcc38d3c03a0707f3c36e974d AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -25,17 +25,23 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 
-FROM registry.access.redhat.com/ubi9-micro@sha256:093a704be0eaef9bb52d9bc0219c67ee9db13c2e797da400ddb5d5ae6849fa10
+FROM registry.access.redhat.com/ubi9-micro@sha256:2173487b3b72b1a7b11edc908e9bbf1726f9df46a4f78fd6d19a2bab0a701f38
 WORKDIR /
 COPY --from=builder /opt/app-root/src/manager .
 COPY LICENSE /licenses/
 USER 65532:65532
 
 # It is mandatory to set these labels
-LABEL name="Tekton Kueue Extension"
-LABEL description="Tekton Kueue Extension"
-LABEL com.redhat.component="Tekton Kueue Extension"
-LABEL io.k8s.description="Tekton Kueue Extension"
-LABEL io.k8s.display-name="Tekton Kueue Extension"
+LABEL \
+    com.redhat.component="openshift-kueue-rhel9-container" \
+    cpe="cpe:/a:redhat:openshift_pipelines:0.3::el9" \
+    description="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.openshift.tags="tekton,openshift,tekton-kueue,kueue" \
+    maintainer="pipelines-extcomm@redhat.com" \
+    name="openshift-pipelines/kueue-rhel9" \
+    summary="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    version="v0.3.1"
 
 ENTRYPOINT ["/manager"]
