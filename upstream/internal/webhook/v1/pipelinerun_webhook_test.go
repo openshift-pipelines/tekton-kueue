@@ -18,14 +18,22 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/konflux-ci/tekton-kueue/internal/cel"
 	"github.com/konflux-ci/tekton-kueue/pkg/common"
 	"github.com/konflux-ci/tekton-kueue/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tektondevv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func TestV1Webhook(t *testing.T) {
@@ -174,17 +182,25 @@ var _ = Describe("PipelineRun Webhook", func() {
 				},
 			}
 
+			programs, err := cel.CompileCELPrograms([]string{`label("env", "test")`})
+			Expect(err).NotTo(HaveOccurred())
+
 			cfg := &config.Config{
 				QueueName: "test-queue",
 			}
 			cfgStore := &ConfigStore{
 				config: cfg,
+				mutators: []PipelineRunMutator{
+					cel.NewCELMutator(programs),
+				},
 			}
-			var err error
 			defaulter, err = NewCustomDefaulter(cfgStore)
 			Expect(err).NotTo(HaveOccurred())
-			err = defaulter.Default(ctx, invalidPlr)
-			Expect(err).To(HaveOccurred())
+			Expect(defaulter.Default(ctx, invalidPlr)).
+				Error().
+				To(And(
+					Satisfy(errors.IsBadRequest),
+					MatchError(ContainSubstring("invalid pipelinerun: expected exactly one, got neither: pipelineRef, pipelineSpec"))))
 		})
 
 		It("should accept a PipelineRun with pipelineSpec containing a parameter without explicit type", func(ctx context.Context) {
@@ -255,5 +271,183 @@ var _ = Describe("PipelineRun Webhook", func() {
 			Expect(plrWithParamNoType.Spec.Status).To(Equal(tektondevv1.PipelineRunSpecStatus(tektondevv1.PipelineRunSpecStatusPending)))
 			Expect(plrWithParamNoType.Labels[common.QueueLabel]).To(Equal("test-queue"))
 		})
+
+		It("should reject an invalid PipelineRun", func(ctx context.Context) {
+			// found via fuzzing
+			badJson := []byte("{\"spec\":{\"pipelineSpec\":{\"params\":[{}]},\"params\":[{}]}}")
+
+			pipelineRun := tektondevv1.PipelineRun{}
+			Expect(json.Unmarshal(badJson, &pipelineRun)).To(Succeed())
+
+			programs, err := cel.CompileCELPrograms([]string{`label("env", "test")`})
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg := &config.Config{
+				QueueName: "test-queue",
+			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+				mutators: []PipelineRunMutator{
+					cel.NewCELMutator(programs),
+				},
+			}
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			// we expect to see a 400 Bad Request here
+			Expect(defaulter.Default(ctx, &pipelineRun)).
+				Error().
+				To(And(
+					Satisfy(errors.IsBadRequest),
+					MatchError(ContainSubstring("pipelinerun validation failed"))))
+		})
+
+		It("should reject a non-pipelinerun object", func(ctx context.Context) {
+			cfg := &config.Config{
+				QueueName: "test-queue",
+			}
+			cfgStore := &ConfigStore{
+				config: cfg,
+			}
+			var err error
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			// we don't expect to see this in practice, but better safe than sorry
+			Expect(defaulter.Default(ctx, &tektondevv1.Pipeline{})).
+				Error().
+				To(And(
+					Satisfy(errors.IsBadRequest),
+					MatchError(ContainSubstring("expected a PipelineRun object but got *v1.Pipeline"))))
+		})
+	})
+})
+
+// minimalPipelineRunJSON is a raw admission request as it would arrive from
+// kubectl — no taskRunTemplate, no serviceAccountName, no status sub-resource.
+var minimalPipelineRunJSON = []byte(`{
+	"apiVersion": "tekton.dev/v1",
+	"kind": "PipelineRun",
+	"metadata": {
+		"name": "test-plr",
+		"namespace": "default"
+	},
+	"spec": {
+		"pipelineRef": {"name": "test-pipeline"}
+	}
+}`)
+
+// prePopulatedPipelineRunJSON is a raw  admission request. It has all the fields prepopulated
+// Webhook is not supposed apply any patch here
+var prePopulatedPipelineRunJSON = []byte(`{
+	"apiVersion": "tekton.dev/v1",
+	"kind": "PipelineRun",
+	"metadata": {
+		"name": "test-plr",
+		"namespace": "default",
+		"labels" : {
+			"kueue.x-k8s.io/queue-name": "test-queue"
+		}
+	},
+	"spec": {
+		"status" : "PipelineRunPending",
+		"pipelineRef": {"name": "test-pipeline"}
+	}
+}`)
+
+// fieldsWeNeverTouch lists spec/status fields the webhook should never patch.
+var fieldsWeNeverTouch = []string{
+	"taskRunTemplate",
+	"serviceAccountName",
+	"taskRunSpecs",
+	"workspaces",
+	"timeouts",
+}
+
+func makeAdmissionRequest(raw []byte) admission.Request {
+	return admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Object:    k8sruntime.RawExtension{Raw: raw},
+			Operation: admissionv1.Create,
+		},
+	}
+}
+
+var _ = Describe("Zero-value field leak (issue #319)", func() {
+	var (
+		cfgStore *ConfigStore
+		scheme   *k8sruntime.Scheme
+	)
+
+	BeforeEach(func() {
+		cfgStore = &ConfigStore{config: &config.Config{QueueName: "test-queue"}}
+		scheme = k8sruntime.NewScheme()
+		Expect(tektondevv1.AddToScheme(scheme)).To(Succeed())
+	})
+
+	It("raw CustomDefaulter leaks zero-value struct fields into patches", func(ctx context.Context) {
+
+		defaulter, err := NewCustomDefaulter(cfgStore)
+		Expect(err).NotTo(HaveOccurred())
+		unfiltered := admission.WithCustomDefaulter(scheme, &tektondevv1.PipelineRun{}, defaulter)
+		resp := unfiltered.Handle(ctx, makeAdmissionRequest(minimalPipelineRunJSON))
+		Expect(resp.Allowed).To(BeTrue())
+
+		_, _ = fmt.Fprintf(GinkgoWriter, "\n=== Unfiltered patches (%d) ===\n", len(resp.Patches))
+		for i, p := range resp.Patches {
+			_, _ = fmt.Fprintf(GinkgoWriter, "  [%d] op=%-7s path=%s\n", i, p.Operation, p.Path)
+		}
+
+		leaked := false
+		for _, p := range resp.Patches {
+			for _, field := range fieldsWeNeverTouch {
+				if strings.Contains(p.Path, field) {
+					leaked = true
+				}
+			}
+		}
+		Expect(leaked).To(BeTrue(),
+			"expected the raw CustomDefaulter to leak zero-value fields — "+
+				"if this passes, Go's json.Marshal omitempty behavior may have changed")
+	})
+
+	It("patchFilteringWebhook strips the leaked fields", func(ctx context.Context) {
+		defaulter, err := NewCustomDefaulter(cfgStore)
+		Expect(err).NotTo(HaveOccurred())
+
+		inner := admission.WithCustomDefaulter(scheme, &tektondevv1.PipelineRun{}, defaulter)
+		filtered := &patchFilteringWebhook{inner: inner}
+
+		resp := filtered.Handle(ctx, makeAdmissionRequest(minimalPipelineRunJSON))
+		Expect(resp.Allowed).To(BeTrue())
+		Expect(resp.Patches).NotTo(BeEmpty())
+
+		_, _ = fmt.Fprintf(GinkgoWriter, "\n=== Filtered patches (%d) ===\n", len(resp.Patches))
+		for i, p := range resp.Patches {
+			_, _ = fmt.Fprintf(GinkgoWriter, "  [%d] op=%-7s path=%s\n", i, p.Operation, p.Path)
+		}
+
+		for _, p := range resp.Patches {
+			for _, field := range fieldsWeNeverTouch {
+				Expect(p.Path).NotTo(ContainSubstring(field),
+					fmt.Sprintf("patch at %s still contains '%s' after filtering", p.Path, field))
+			}
+		}
+	})
+
+	// This Test validates the case when PipelineRun Contains all the fields and Webhook is not expected to apply Any patch.
+	// In Such Scenario Handler webhook should set the Patch and PatchType to Nil
+	// Both these values should be sync otherwise Kubernetes will not be able to process the PipelineRun.
+	It("patchFilteringWebhook sets Patch and PatchType to nil when there is nothing to patch", func(ctx context.Context) {
+		defaulter, err := NewCustomDefaulter(cfgStore)
+		Expect(err).NotTo(HaveOccurred())
+
+		inner := admission.WithCustomDefaulter(scheme, &tektondevv1.PipelineRun{}, defaulter)
+		filtered := &patchFilteringWebhook{inner: inner}
+
+		resp := filtered.Handle(ctx, makeAdmissionRequest(prePopulatedPipelineRunJSON))
+
+		Expect(resp.Allowed).To(BeTrue())
+		Expect(resp.Patches).To(BeEmpty())
+		Expect(resp.Patch).To(BeNil())
+		Expect(resp.PatchType).To(BeNil())
 	})
 })
