@@ -40,6 +40,11 @@ spec:
     value: |
       {"type": "gomod", "path": "upstream"}
 
+  - name: repo-name
+    value: "tekton-kueue"
+  - name: slack-group-ids
+    value:
+      - "S0AS9T1JWHM"
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
