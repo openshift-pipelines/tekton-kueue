@@ -33,7 +33,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-scheduler-rhel9" \
     summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    version="v1.23.2"
+    version="v1.23.0"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
