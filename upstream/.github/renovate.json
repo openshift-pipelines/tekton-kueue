@@ -1,0 +1,97 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>konflux-ci/mintmaker//config/renovate/renovate.json"
+  ],
+  "schedule": ["before 7am on Monday"],
+  "enabledManagers": [
+    "tekton",
+    "dockerfile",
+    "rpm-lockfile",
+    "gomod",
+    "github-actions"
+  ],
+  "addLabels": [
+    "konflux",
+    "mintmaker"
+  ],
+  "ignorePaths": ["upstream/**"],
+  "gomod": {
+    "postUpdateOptions": [
+      "gomodTidy"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Individual PRs for go module patch bumps (auto-approved after CI passes)",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["patch"]
+    },
+    {
+      "description": "Individual PRs for go module digest bumps (pseudo-versions have no semver guarantees, treated as minor)",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["digest"]
+    },
+    {
+      "description": "Individual PRs for go module minor bumps",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor"]
+    },
+    {
+      "description": "Individual PRs for go module major bumps (no groupName = one PR per package)",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["major"]
+    },
+    {
+      "description": "Group Kubernetes and controller-runtime updates together",
+      "groupName": "go-modules k8s",
+      "matchManagers": ["gomod"],
+      "matchPackagePatterns": ["^k8s\\.io/"],
+      "matchPackageNames": ["sigs.k8s.io/controller-runtime"],
+      "matchUpdateTypes": ["minor", "major", "digest"]
+    },
+    {
+      "description": "Label direct dependencies",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["dependencies"],
+      "addLabels": ["dependency/direct"]
+    },
+    {
+      "description": "Label transitive (indirect) dependencies",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "addLabels": ["dependency/transitive"]
+    },
+    {
+      "description": "Prioritize Konflux tekton task reference updates",
+      "matchManagers": ["tekton"],
+      "prPriority": 10
+    },
+    {
+      "description": "Dockerfile updates (except Go toolchain, auto-approved after CI passes)",
+      "matchManagers": ["dockerfile"],
+      "excludePackagePatterns": ["go-toolset"]
+    },
+    {
+      "description": "Go toolchain updates — deptriage defers approval until CI passes",
+      "matchManagers": ["dockerfile"],
+      "matchPackagePatterns": ["go-toolset"]
+    },
+    {
+      "description": "RPM lockfile updates (auto-approved after CI passes)",
+      "matchManagers": ["rpm-lockfile"]
+    },
+    {
+      "description": "Block kueue upgrades beyond 0.16.x — kueue v0.17+ drops v1beta1 API support entirely",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["sigs.k8s.io/kueue"],
+      "allowedVersions": "<0.17.0"
+    },
+    {
+      "description": "Block k8s library upgrades beyond 0.35.x — kueue v0.16.x is built against k8s 0.35",
+      "matchManagers": ["gomod"],
+      "matchPackagePatterns": ["^k8s\\.io/"],
+      "allowedVersions": "<0.36.0"
+    }
+  ]
+}

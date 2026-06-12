@@ -34,6 +34,15 @@ func TestMutate(t *testing.T) {
 	RunSpecs(t, "Mutate Suite")
 }
 
+const validPipelineRunYAML = `apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: test-pipelinerun
+spec:
+  pipelineRef:
+    name: my-pipeline
+`
+
 var _ = Describe("MutatePipelineRun", func() {
 	var (
 		tmpDir string
@@ -56,16 +65,8 @@ var _ = Describe("MutatePipelineRun", func() {
 			Expect(os.WriteFile(configPath, []byte(`queueName: "test-queue"`), 0644)).To(Succeed())
 
 			// Write PipelineRun file
-			plrContent := `apiVersion: tekton.dev/v1
-kind: PipelineRun
-metadata:
-  name: test-pipelinerun
-spec:
-  pipelineRef:
-    name: my-pipeline
-`
 			plrPath := filepath.Join(tmpDir, "pipelinerun.yaml")
-			Expect(os.WriteFile(plrPath, []byte(plrContent), 0644)).To(Succeed())
+			Expect(os.WriteFile(plrPath, []byte(validPipelineRunYAML), 0644)).To(Succeed())
 
 			// Call MutatePipelineRun
 			mutatedData, err := MutatePipelineRun(plrPath, tmpDir)
@@ -91,16 +92,8 @@ cel:
 			Expect(os.WriteFile(configPath, []byte(configContent), 0644)).To(Succeed())
 
 			// Write PipelineRun file
-			plrContent := `apiVersion: tekton.dev/v1
-kind: PipelineRun
-metadata:
-  name: test-pipelinerun
-spec:
-  pipelineRef:
-    name: my-pipeline
-`
 			plrPath := filepath.Join(tmpDir, "pipelinerun.yaml")
-			Expect(os.WriteFile(plrPath, []byte(plrContent), 0644)).To(Succeed())
+			Expect(os.WriteFile(plrPath, []byte(validPipelineRunYAML), 0644)).To(Succeed())
 
 			// Call MutatePipelineRun
 			mutatedData, err := MutatePipelineRun(plrPath, tmpDir)
@@ -178,6 +171,30 @@ spec: {}
 			Expect(err).To(HaveOccurred())
 			Expect(k8serrors.IsBadRequest(err)).To(BeTrue(), "expected BadRequest error, got: %v", err)
 			Expect(err.Error()).To(ContainSubstring("expected exactly one, got neither: pipelineRef, pipelineSpec"))
+		})
+	})
+
+	Context("with CEL evaluation error", func() {
+		It("should return InternalServerError when a CEL expression fails at runtime", func() {
+			// Write config with a CEL expression that accesses a non-existent field
+			configPath := filepath.Join(tmpDir, "config.yaml")
+			configContent := `
+queueName: "test-queue"
+cel:
+  expressions:
+    - 'annotation("key", pipelineRun.doesNotExist)'
+`
+			Expect(os.WriteFile(configPath, []byte(configContent), 0644)).To(Succeed())
+
+			// Write a valid PipelineRun
+			plrPath := filepath.Join(tmpDir, "pipelinerun.yaml")
+			Expect(os.WriteFile(plrPath, []byte(validPipelineRunYAML), 0644)).To(Succeed())
+
+			// Call MutatePipelineRun - should fail with an InternalServerError
+			_, err := MutatePipelineRun(plrPath, tmpDir)
+			Expect(err).To(HaveOccurred())
+			Expect(k8serrors.IsInternalError(err)).To(BeTrue(), "expected InternalServerError, got: %v", err)
+			Expect(err.Error()).To(ContainSubstring("CEL evaluation failed"))
 		})
 	})
 
