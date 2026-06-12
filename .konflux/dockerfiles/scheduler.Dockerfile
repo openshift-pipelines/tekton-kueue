@@ -1,5 +1,5 @@
 ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:latest
-ARG RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:5b74fce9d6e629942a0c6dc0f546c193e70d7f974d999a48c948c53dd3d36362
+ARG UBI_RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 FROM $GO_BUILDER AS builder
 
@@ -15,7 +15,7 @@ RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHA
     ./cmd/main.go
 # RUN /bin/sh -c 'echo $CI_OPERATOR_UPSTREAM_COMMIT > /tmp/HEAD'
 
-FROM $RUNTIME
+FROM $UBI_RUNTIME
 
 ARG VERSION=1.22
 
