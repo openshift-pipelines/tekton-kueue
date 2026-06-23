@@ -16,6 +16,14 @@ resource-aware scheduling via admission webhook and CEL-based mutations.
 | Deploy         | `make deploy IMG=<tag>`                               |
 | Mutate CLI     | `tekton-kueue mutate --pipelinerun-file <f> --config-dir <d>` |
 
+### Single-File Verification
+
+- Lint package: `golangci-lint run ./path/to/package/`
+- Vet package: `go vet ./path/to/package/`
+- Test package: `go test ./path/to/package/`
+- Test with race: `go test -race ./path/to/package/`
+- Format file: `gofmt -w path/to/file.go`
+
 ## Project Layout
 
 - `cmd/` — entrypoint with subcommands: `controller`, `webhook`, `mutate`.
@@ -54,6 +62,15 @@ resource-aware scheduling via admission webhook and CEL-based mutations.
 - `dep-triage` — auto-triages Renovate/Konflux bot dependency PRs.
 - `auto-merge` — merges approved dependency PRs when all checks pass.
 
+## Pattern References
+
+When making common changes, use these as reference implementations:
+- **New CEL function**: see `internal/cel/compiler.go` (`createCELEnvironment` registers functions)
+- **New webhook mutation**: see `internal/webhook/v1/pipelinerun_webhook.go`
+- **New controller reconciler**: see `internal/controller/pipelinerun_controller.go`
+- **New CLI subcommand**: see `cmd/main.go` for dispatch and flag parsing, `pkg/mutate/` for logic
+- **Dependency management policy**: see `docs/dependency-policy.md`
+
 ## Gotchas
 
 - E2E tests use `KIND_EXPERIMENTAL_PROVIDER=podman`.
@@ -61,3 +78,9 @@ resource-aware scheduling via admission webhook and CEL-based mutations.
 - Kueue must have `pipelineruns.tekton.dev` in external frameworks config.
 - Changing CEL expression syntax may silently change PipelineRun mutations
   in production — always test with `mutate` CLI first.
+
+## Skills
+
+- Before opening a PR, writing a PR description, or interpreting CI results, read `skills/pr-workflow.md`
+- When a CI check fails on a PR, read `skills/ci-troubleshooting.md`
+- When working interactively on new features or significant changes, read `skills/brainstorming-workflow.md` before making changes
