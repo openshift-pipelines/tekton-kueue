@@ -1,5 +1,5 @@
 ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:latest
-ARG RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ARG UBI_RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 FROM $GO_BUILDER AS builder
 
@@ -11,18 +11,13 @@ COPY head HEAD
 
 
 ENV GODEBUG="http2server=0"
-RUN go mod download
-RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -o /tmp/tekton-kueue \
+RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -o /tmp/manager \
     ./cmd/main.go
 # RUN /bin/sh -c 'echo $CI_OPERATOR_UPSTREAM_COMMIT > /tmp/HEAD'
 
-FROM $RUNTIME
+FROM $UBI_RUNTIME
 
-ENV KUEUE=/tmp/tekton-kueue  \
-    KO_DATA_PATH=/kodata
-
-COPY --from=builder $KUEUE $KUEUE
-
+COPY --from=builder /tmp/manager /manager
 LABEL \
     com.redhat.component="openshift-pipelines-scheduler-rhel9-container" \
     cpe="cpe:/a:redhat:openshift_pipelines:next::" \
@@ -38,4 +33,4 @@ LABEL \
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
 
-ENTRYPOINT [ "${KUEUE}" ]
+ENTRYPOINT [ "/manager" ]
