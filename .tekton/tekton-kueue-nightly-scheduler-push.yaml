@@ -26,7 +26,7 @@ spec:
   - name: git-url
     value: '{{source_url}}'
   - name: upstream-git-url
-    value: 'https://github.com/konflux-ci/tekton-kueue'
+    value: 'https://github.com/tektoncd/tekton-kueue'
   - name: revision
     value: '{{revision}}'
   - name: output-image
