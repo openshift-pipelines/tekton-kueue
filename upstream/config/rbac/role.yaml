@@ -78,3 +78,10 @@ rules:
   - pipelineruns/finalizers
   verbs:
   - update
+- apiGroups:
+  - tekton.dev
+  resources:
+  - pipelineruns/status
+  verbs:
+  - patch
+  - update

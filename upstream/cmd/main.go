@@ -256,6 +256,11 @@ func runController(args []string) {
 		os.Exit(1)
 	}
 
+	if err = controller.SetupPendingStatusWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to setup pending status controller")
+		os.Exit(1)
+	}
+
 	err = controller.SetupIndexer(ctx, mgr.GetFieldIndexer())
 	if err != nil {
 		setupLog.Error(err, "Failed to setup the indexer")
