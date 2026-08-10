@@ -134,7 +134,7 @@ var _ = Describe("Manager", Ordered, func() {
 			}))
 		})
 
-		By("Deploying ResourceFlavoer, ClusterQueue and Local Queue", func() {
+		By("Deploying ResourceFlavor, ClusterQueue and Local Queue", func() {
 			cmd := exec.Command(
 				"kubectl",
 				"apply",
@@ -150,8 +150,14 @@ var _ = Describe("Manager", Ordered, func() {
 	})
 
 	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
-	// and deleting the namespace.
+	// and deleting the namespace. Set SKIP_CLEANUP=true to keep resources running (e.g., for
+	// collecting coverage data from instrumented pods before teardown).
 	AfterAll(func() {
+		if os.Getenv("SKIP_CLEANUP") == "true" { //nolint:goconst
+			By("skipping cleanup because SKIP_CLEANUP is set")
+			return
+		}
+
 		By("cleaning up the curl pod for metrics")
 		cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
 		_, _ = utils.Run(cmd)
@@ -485,11 +491,15 @@ var _ = Describe("Manager", Ordered, func() {
 						return err
 					}
 					const defaultPriorityClassName = "tekton-kueue-default"
-					if wl.Spec.PriorityClassRef.Name != defaultPriorityClassName {
+					priorityName := ""
+					if wl.Spec.PriorityClassRef != nil {
+						priorityName = wl.Spec.PriorityClassRef.Name
+					}
+					if priorityName != defaultPriorityClassName {
 						return fmt.Errorf(
 							"Workload should have priority class %s, but has %s",
 							defaultPriorityClassName,
-							wl.Spec.PriorityClassRef.Name,
+							priorityName,
 						)
 					}
 					return err
@@ -638,6 +648,43 @@ var _ = Describe("Manager", Ordered, func() {
 
 	})
 
+	Context("CEL managedBy sets Spec.ManagedBy", Ordered, Label("config", "smoke"), func() {
+		managedByValue := "test-controller.example.io"
+		kueueConfig := config.Config{
+			QueueName: "local-queue",
+			CEL: config.CEL{
+				Expressions: []string{
+					fmt.Sprintf(`managedBy("%s")`, managedByValue),
+				},
+			},
+		}
+
+		cfgMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      common.ConfigMapName,
+				Namespace: "tekton-kueue",
+			},
+			Data: map[string]string{},
+		}
+
+		It("should set ManagedBy on created PipelineRun", func(ctx context.Context) {
+			cfgMapData, err := yaml.Marshal(kueueConfig)
+			Expect(err).ToNot(HaveOccurred())
+
+			cfgMap.Data[common.ConfigKey] = string(cfgMapData)
+
+			err = k8sClient.Update(ctx, cfgMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() *string {
+				plr := plrTemplate.DeepCopy()
+				err = k8sClient.Create(ctx, plr)
+				Expect(err).NotTo(HaveOccurred())
+				return plr.Spec.ManagedBy
+			}).WithTimeout(time.Duration(30) * time.Second).Should(HaveValue(Equal(managedByValue)))
+		})
+	})
+
 	Context("Ignore Config when ConfigMap is updated with invalid Values", Ordered, Label("config", "smoke"), func() {
 		queueName := "my-ignored-queue"
 		kueueConfig := config.Config{
@@ -682,7 +729,17 @@ var _ = Describe("Manager", Ordered, func() {
 				ShouldNot(Equal(queueName))
 
 		})
+	})
 
+	Context("Invalid resource is requested", Ordered, func() {
+		var plr *tekv1.PipelineRun
+		It("rejects the PipelineRun", func(ctx context.Context) {
+			plr = plrTemplate.DeepCopy()
+			plr.Annotations = map[string]string{
+				"kueue.konflux-ci.dev/requests-memory+invalid": "2Gi",
+			}
+			Expect(k8sClient.Create(ctx, plr)).Should(MatchError(kerrors.IsInvalid, "Invalid"))
+		})
 	})
 })
 
