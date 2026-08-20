@@ -20,7 +20,7 @@ FROM $UBI_RUNTIME
 COPY --from=builder /tmp/manager /manager
 LABEL \
     com.redhat.component="openshift-pipelines-scheduler-rhel10-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:nightly::el10" \
+    cpe="cpe:/a:redhat:openshift_pipelines:nightly::rhel10" \
     description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
