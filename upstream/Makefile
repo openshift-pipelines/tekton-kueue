@@ -1,5 +1,6 @@
 # Image URL to use all building/pushing image targets
-IMG ?= tekton-kueue:latest
+IMG ?= ghcr.io/tektoncd/tekton-kueue:latest
+RELEASE_IMAGE ?= $(IMG)
 KIND_CLUSTER ?= kind
 RELEASE_DIR ?= release
 VERSION ?= nightly
@@ -135,15 +136,21 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
+	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(IMG)" > dist/install.yaml
 
 .PHONY: release
 release: kustomize
-	mkdir -p ${RELEASE_DIR}
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default -o ${RELEASE_DIR}/release-${VERSION}.yaml
+	mkdir -p "$(RELEASE_DIR)"
+	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(RELEASE_IMAGE)" > "$(RELEASE_DIR)/release-$(VERSION).yaml"
+
+.PHONY: verify-release
+verify-release: kustomize
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	image=ghcr.io/tektoncd/tekton-kueue:v0.0.0-test@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; \
+	$(MAKE) --no-print-directory release RELEASE_DIR="$$tmp" VERSION=v0.0.0-test RELEASE_IMAGE="$$image"; \
+	matches=$$(grep -Fc "image: $$image" "$$tmp/release-v0.0.0-test.yaml"); \
+	test "$$matches" -eq 2; \
+	! grep -Eq 'quay.io|konflux-ci/tekton-kueue' "$$tmp/release-v0.0.0-test.yaml"
 
 ##@ Deployment
 
@@ -162,9 +169,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply --server-side -f -
+	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(IMG)" | $(KUBECTL) apply --server-side -f -
 	$(KUBECTL) wait --for=condition=Available deployment --all -n tekton-kueue --timeout=300s
 
 .PHONY: undeploy
@@ -199,7 +204,7 @@ CERT_MANAGER_VERSION ?= v1.19.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
+$(KUSTOMIZE): | $(LOCALBIN)
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
 
 .PHONY: controller-gen
