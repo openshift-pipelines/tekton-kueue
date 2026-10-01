@@ -1,19 +1,22 @@
 name: E2E Tests
 
 on:
-  pull_request:
+  workflow_call:
 
 jobs:
   test-e2e:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     env:
       IMG: konflux-ci.dev/tekton-kueue:v0.0.1
     steps:
       - name: Clone the code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -63,11 +66,11 @@ jobs:
         if: always()
         run: |
           mkdir -p coverage-output && chmod 777 coverage-output
-          cp $HOME/.kube/config /tmp/kubeconfig && chmod 644 /tmp/kubeconfig
+          cp "$HOME/.kube/config" /tmp/kubeconfig && chmod 644 /tmp/kubeconfig
           podman run --rm \
             --network host \
             -v /tmp/kubeconfig:/kubeconfig:ro \
-            -v $PWD/coverage-output:/workspace/coverage-output \
+            -v "$PWD/coverage-output:/workspace/coverage-output" \
             -e KUBECONFIG=/kubeconfig \
             quay.io/konflux-ci/konflux-devprod/coverport-cli \
             collect \
