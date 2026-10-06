@@ -1,4 +1,4 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:latest@sha256:5e68f09a652ac6627a83c57655e42e24575efb278b54336039c9308607fc6b21
+ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.25
 ARG UBI_RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 FROM $GO_BUILDER AS builder
@@ -20,7 +20,7 @@ FROM $UBI_RUNTIME
 COPY --from=builder /tmp/manager /manager
 LABEL \
     com.redhat.component="openshift-pipelines-scheduler-rhel9-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:next::" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.20::el9" \
     description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
@@ -28,7 +28,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-scheduler-rhel9" \
     summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    version="next"
+    version="v1.20.4"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
