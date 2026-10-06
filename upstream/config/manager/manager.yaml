@@ -35,12 +35,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - args:
+      - command:
+        - /manager
+        args:
           - controller
           - --leader-elect
           - --health-probe-bind-address=:8081
           - --metrics-bind-address=:8443
-        image: controller
+        image: controller:latest
         name: manager
         ports:
         - containerPort: 8443
