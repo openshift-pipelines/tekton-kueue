@@ -6,25 +6,22 @@ import (
 )
 
 var (
-	// configReloadTotal tracks the total number of webhook configuration reloads,
-	// labeled by result ("success" or "failure"). Incremented each time the
-	// ConfigMapReconciler triggers a config update.
+	// celReloadsTotal tracks the total number of CEL Reloads
 	configReloadTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "tekton_kueue_config_reload_total",
 			Help: "Total number of Config reloads",
 		},
-		[]string{"result"},
+		[]string{"result"}, // result can be "success" or "failure"
 	)
 
-	// configReloadFailureTotal is currently unused but registered for
-	// backwards compatibility with existing dashboards.
+	// celMutationsTotal tracks the total number of CEL mutation operations
 	configReloadFailureTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "tekton_kueue_config_reload_failure_total",
 			Help: "Total number of Config reload failures",
 		},
-		[]string{"result"},
+		[]string{"result"}, // result: "success" or "failure"
 	)
 )
 
@@ -34,12 +31,12 @@ func init() {
 	metrics.Registry.MustRegister(configReloadFailureTotal)
 }
 
-// RecordReloadFailure increments the counter for config reload failures.
+// RecordReloadFailure increments the counter for CEL Reload failures
 func RecordReloadFailure() {
 	configReloadTotal.WithLabelValues("failure").Inc()
 }
 
-// RecordReloadSuccess increments the counter for successful config reloads.
+// RecordReloadSuccess increments the counter for successful CEL Reloads
 func RecordReloadSuccess() {
 	configReloadTotal.WithLabelValues("success").Inc()
 }
