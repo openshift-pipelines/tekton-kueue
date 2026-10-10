@@ -1,7 +1,8 @@
 kind: Kustomization
 images:
 - name: controller
-  newName: ghcr.io/tektoncd/tekton-kueue
+  newName: konflux-ci/tekton-kueue
+  newTag: latest
 resources:
 - deployment.yaml
 - manifests.yaml

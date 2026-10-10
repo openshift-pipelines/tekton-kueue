@@ -1,6 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= ghcr.io/tektoncd/tekton-kueue:latest
-RELEASE_IMAGE ?= $(IMG)
+IMG ?= tekton-kueue:latest
 KIND_CLUSTER ?= kind
 RELEASE_DIR ?= release
 VERSION ?= nightly
@@ -17,7 +16,6 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= podman
-ENABLE_COVERAGE ?= false
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -110,7 +108,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --build-arg ENABLE_COVERAGE=$(ENABLE_COVERAGE) -t ${IMG} .
+	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -136,24 +134,15 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
-	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(IMG)" > dist/install.yaml
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 .PHONY: release
 release: kustomize
-	mkdir -p "$(RELEASE_DIR)"
-	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(RELEASE_IMAGE)" > "$(RELEASE_DIR)/release-$(VERSION).yaml"
-
-.PHONY: verify-release
-verify-release: kustomize
-	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
-	for image in \
-		ghcr.io/tektoncd/tekton-kueue:v0.0.0-test@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-		ko://github.com/konflux-ci/tekton-kueue/cmd; do \
-		$(MAKE) --no-print-directory release RELEASE_DIR="$$tmp" VERSION=v0.0.0-test RELEASE_IMAGE="$$image"; \
-		matches=$$(awk '$$1 == "image:" {print $$2}' "$$tmp/release-v0.0.0-test.yaml" | grep -Fxc "$$image"); \
-		test "$$matches" -eq 2; \
-		! grep -Fq -- '- /manager' "$$tmp/release-v0.0.0-test.yaml" || exit 1; \
-	done
+	mkdir -p ${RELEASE_DIR}
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default -o ${RELEASE_DIR}/release-${VERSION}.yaml
 
 ##@ Deployment
 
@@ -172,7 +161,9 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(IMG)" | $(KUBECTL) apply --server-side -f -
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply --server-side -f -
 	$(KUBECTL) wait --for=condition=Available deployment --all -n tekton-kueue --timeout=300s
 
 .PHONY: undeploy
@@ -201,13 +192,13 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v2.7.2
-KUEUE_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/kueue)
-TEKTON_VERSION ?= $(shell go list -m -f "{{ .Version }}" github.com/tektoncd/pipeline)
+KUEUE_VERSION ?= $(shell ./hack/get-kueue-version.sh)
+TEKTON_VERSION ?= v0.70.0
 CERT_MANAGER_VERSION ?= v1.19.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): | $(LOCALBIN)
+$(KUSTOMIZE): $(LOCALBIN)
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
 
 .PHONY: controller-gen
@@ -256,7 +247,7 @@ kueue:
 
 .PHONY: tekton
 tekton:
-	$(KUBECTL) apply --server-side -f https://github.com/tektoncd/pipeline/releases/download/$(TEKTON_VERSION)/release.yaml
+	$(KUBECTL) apply --server-side -f https://storage.googleapis.com/tekton-releases/pipeline/previous/$(TEKTON_VERSION)/release.yaml
 	$(KUBECTL) wait --for=condition=Available deployment --all -n tekton-pipelines --timeout=300s
 
 .PHONY: cert-manager
