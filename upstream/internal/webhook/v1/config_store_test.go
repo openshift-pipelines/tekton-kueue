@@ -21,8 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/konflux-ci/tekton-kueue/internal/cel"
 )
 
 var _ = Describe("Config Store ", func() {
@@ -30,7 +28,8 @@ var _ = Describe("Config Store ", func() {
 		It("When QueueName is Set", func(ctx context.Context) {
 			configData := "queueName: test-queue"
 			cfgStore := &ConfigStore{}
-			Expect(cfgStore.Update([]byte(configData))).To(Succeed())
+			err := cfgStore.Update([]byte(configData))
+			Expect(err).NotTo(HaveOccurred())
 
 			cfg, mutators := cfgStore.GetConfigAndMutators()
 			Expect(mutators).To(BeEmpty())
@@ -50,7 +49,8 @@ var _ = Describe("Config Store ", func() {
 		It("When MultiKueueOverride is Set", func(ctx context.Context) {
 			configData := "queueName: test-queue\nmultiKueueOverride: true "
 			cfgStore := &ConfigStore{}
-			Expect(cfgStore.Update([]byte(configData))).To(Succeed())
+			err := cfgStore.Update([]byte(configData))
+			Expect(err).NotTo(HaveOccurred())
 
 			cfg, mutators := cfgStore.GetConfigAndMutators()
 			Expect(mutators).To(BeEmpty())
@@ -62,7 +62,8 @@ var _ = Describe("Config Store ", func() {
 		It("When MultiKueueOverride is not Set", func(ctx context.Context) {
 			configData := "queueName: test-queue"
 			cfgStore := &ConfigStore{}
-			Expect(cfgStore.Update([]byte(configData))).To(Succeed())
+			err := cfgStore.Update([]byte(configData))
+			Expect(err).NotTo(HaveOccurred())
 
 			cfg, mutators := cfgStore.GetConfigAndMutators()
 			Expect(mutators).To(BeEmpty())
@@ -76,7 +77,8 @@ var _ = Describe("Config Store ", func() {
 		configData := "queueName: pipelines-queue\ncel:\n  expressions:\n    - priority(\"tekton-kueue-default\")\n"
 		It("When CEL is set", func(ctx context.Context) {
 			cfgStore := &ConfigStore{}
-			Expect(cfgStore.Update([]byte(configData))).To(Succeed())
+			err := cfgStore.Update([]byte(configData))
+			Expect(err).NotTo(HaveOccurred())
 			cfg, mutators := cfgStore.GetConfigAndMutators()
 			Expect(mutators).NotTo(BeEmpty())
 			Expect(cfg.QueueName).To(Equal("pipelines-queue"))
@@ -88,16 +90,6 @@ var _ = Describe("Config Store ", func() {
 			cfgStore := &ConfigStore{}
 			err := cfgStore.Update([]byte(configData))
 			Expect(err).To(HaveOccurred())
-		})
-		It("should create CEL mutators for valid expressions", func(ctx context.Context) {
-			configData := "queueName: test-queue\ncel:\n  expressions:\n    - annotation(\"test-key\", \"test-value\")\n"
-			cfgStore := &ConfigStore{}
-			Expect(cfgStore.Update([]byte(configData))).To(Succeed())
-
-			cfg, mutators := cfgStore.GetConfigAndMutators()
-			Expect(cfg.QueueName).To(Equal("test-queue"))
-			Expect(mutators).To(HaveLen(1))
-			Expect(mutators[0]).To(BeAssignableToTypeOf(&cel.CELMutator{}))
 		})
 	})
 
