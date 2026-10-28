@@ -19,15 +19,15 @@ FROM $UBI_RUNTIME
 
 COPY --from=builder /tmp/manager /manager
 LABEL \
-    com.redhat.component="openshift-pipelines-scheduler-rhel9-container" \
+    com.redhat.component="openshift-pipelines-kueue-rhel9-container" \
     cpe="cpe:/a:redhat:openshift_pipelines:next::" \
-    description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    io.openshift.tags="tekton,openshift,tekton-kueue,scheduler" \
+    description="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.openshift.tags="tekton,openshift,tekton-kueue,kueue" \
     maintainer="pipelines-extcomm@redhat.com" \
-    name="openshift-pipelines/pipelines-scheduler-rhel9" \
-    summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+    name="openshift-pipelines/pipelines-kueue-rhel9" \
+    summary="Red Hat OpenShift Pipelines tekton-kueue kueue" \
     version="next"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
