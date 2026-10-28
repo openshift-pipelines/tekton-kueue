@@ -12,14 +12,14 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "nightly" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/scheduler.Dockerfile".pathChanged() ||
-      ".tekton/tekton-kueue-nightly-scheduler-push.yaml".pathChanged())
+      ".konflux/dockerfiles/kueue.Dockerfile".pathChanged() ||
+      ".tekton/tekton-kueue-nightly-kueue-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-nightly
-    appstudio.openshift.io/component: tekton-kueue-nightly-scheduler
+    appstudio.openshift.io/component: tekton-kueue-nightly-kueue
     pipelines.appstudio.openshift.io/type: build
-  name: tekton-kueue-nightly-scheduler-on-push
+  name: tekton-kueue-nightly-kueue-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,15 +30,15 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-scheduler-rhel10:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-kueue-rhel10:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/scheduler.Dockerfile
+    value: .konflux/dockerfiles/kueue.Dockerfile
   - name: additional-tags
     value:
       - "nightly"
   - name: prefetch-input
     value: |
-      {"type": "gomod", "path": "upstream"}
+      [{"type": "gomod", "path": "upstream"}, {"type": "rpm", "path": ".konflux/rpms"}]
 
   - name: repo-name
     value: "tekton-kueue"
@@ -48,7 +48,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-tekton-kueue-nightly-scheduler
+    serviceAccountName: build-pipeline-tekton-kueue-nightly-kueue
   workspaces:
   - name: git-auth
     secret:
