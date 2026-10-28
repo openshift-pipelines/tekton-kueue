@@ -30,7 +30,11 @@ LABEL \
     summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
     version="nightly"
 
-RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
+# ubi10/ubi-minimal does not ship shadow-utils, which provides groupadd/useradd
+RUN microdnf install -y --nodocs shadow-utils && \
+    groupadd -r -g 65532 nonroot && \
+    useradd --no-log-init -r -u 65532 -g nonroot nonroot && \
+    microdnf clean all
 USER 65532
 
 ENTRYPOINT [ "/manager" ]
