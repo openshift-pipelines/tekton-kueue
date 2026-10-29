@@ -1,4 +1,4 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi10/go-toolset@sha256:557f358c83892a8b94fb72649a99e1c303a625d240547fb97a9cbc1620e808c0
+ARG GO_BUILDER=registry.access.redhat.com/ubi10/go-toolset:latest@sha256:be70aa468168f1ecd46e56d5f362e697243bcf9d3a2d98819597e43471a5d0e4
 ARG UBI_RUNTIME=registry.access.redhat.com/ubi10/ubi-minimal:latest
 
 FROM $GO_BUILDER AS builder
@@ -19,15 +19,15 @@ FROM $UBI_RUNTIME
 
 COPY --from=builder /tmp/manager /manager
 LABEL \
-    com.redhat.component="openshift-pipelines-scheduler-rhel10-container" \
+    com.redhat.component="openshift-pipelines-kueue-rhel10-container" \
     cpe="cpe:/a:redhat:openshift_pipelines:nightly::el10" \
-    description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
-    io.openshift.tags="tekton,openshift,tekton-kueue,scheduler" \
+    description="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.k8s.description="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.k8s.display-name="Red Hat OpenShift Pipelines tekton-kueue kueue" \
+    io.openshift.tags="tekton,openshift,tekton-kueue,kueue" \
     maintainer="pipelines-extcomm@redhat.com" \
-    name="openshift-pipelines/pipelines-scheduler-rhel10" \
-    summary="Red Hat OpenShift Pipelines tekton-kueue scheduler" \
+    name="openshift-pipelines/pipelines-kueue-rhel10" \
+    summary="Red Hat OpenShift Pipelines tekton-kueue kueue" \
     version="nightly"
 
 # ubi10/ubi-minimal does not ship shadow-utils, which provides groupadd/useradd
