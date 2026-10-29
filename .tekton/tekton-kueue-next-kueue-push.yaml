@@ -12,7 +12,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "next" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/scheduler.Dockerfile".pathChanged() ||
+      ".konflux/dockerfiles/kueue.Dockerfile".pathChanged() ||
       ".tekton/tekton-kueue-next-kueue-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -32,13 +32,13 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-kueue-rhel9:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/scheduler.Dockerfile
+    value: .konflux/dockerfiles/kueue.Dockerfile
   - name: additional-tags
     value:
       - "next"
   - name: prefetch-input
     value: |
-      {"type": "gomod", "path": "upstream"}
+      [{"type": "gomod", "path": "upstream"}, {"type": "rpm", "path": ".konflux/rpms"}]
 
   - name: repo-name
     value: "tekton-kueue"
