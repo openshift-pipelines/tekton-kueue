@@ -95,6 +95,10 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+.PHONY: golangci-lint-version
+golangci-lint-version: ## Print the pinned golangci-lint version, for the lint workflow
+	@echo $(GOLANGCI_LINT_VERSION)
+
 ##@ Build
 
 .PHONY: build
@@ -143,6 +147,8 @@ release: kustomize
 	mkdir -p "$(RELEASE_DIR)"
 	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(RELEASE_IMAGE)" > "$(RELEASE_DIR)/release-$(VERSION).yaml"
 
+# Release images are built with ko, which ships the binary at /ko-app/cmd, so
+# the rendered manifest must rely on the image ENTRYPOINT instead of /manager.
 .PHONY: verify-release
 verify-release: kustomize
 	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
@@ -150,6 +156,7 @@ verify-release: kustomize
 	$(MAKE) --no-print-directory release RELEASE_DIR="$$tmp" VERSION=v0.0.0-test RELEASE_IMAGE="$$image"; \
 	matches=$$(grep -Fc "image: $$image" "$$tmp/release-v0.0.0-test.yaml"); \
 	test "$$matches" -eq 2; \
+	! grep -Fq -- '- /manager' "$$tmp/release-v0.0.0-test.yaml" || exit 1; \
 	! grep -Eq 'quay.io|konflux-ci/tekton-kueue' "$$tmp/release-v0.0.0-test.yaml"
 
 .PHONY: verify-release-config
@@ -201,7 +208,8 @@ CONTROLLER_TOOLS_VERSION ?= v0.17.1
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.7.2
+# renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_LINT_VERSION ?= v2.15.0
 KUEUE_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/kueue)
 TEKTON_VERSION ?= $(shell go list -m -f "{{ .Version }}" github.com/tektoncd/pipeline)
 CERT_MANAGER_VERSION ?= v1.19.2
